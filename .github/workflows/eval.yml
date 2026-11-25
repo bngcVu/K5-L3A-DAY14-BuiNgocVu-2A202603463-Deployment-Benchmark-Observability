@@ -1,0 +1,27 @@
+# Quality gate (Exercise 7.3): run_eval.py trả exit code 1 khi accuracy < 85%
+# hoặc có regression, làm job fail. Muốn chặn merge thật thì bật branch protection
+# và đặt check "quality-gate / eval" là Required.
+name: quality-gate
+on: [pull_request]
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 06-lab-complete/benchmark-observability/develop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Start agent and run eval
+        run: |
+          AGENT_VERSION=v2 MOCK_ERROR_RATE=0 python app.py &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/health && break
+            sleep 1
+          done
+          python eval/run_eval.py --url http://localhost:8000 \
+            --min-accuracy 0.85 --baseline reports/eval_v2_fixed.json
